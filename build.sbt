@@ -7,12 +7,15 @@ scalaVersion := "2.12.4"
 organization := "is.kow"
 
 libraryDependencies ++= {
+  val akkaHttpVersion = "10.0.10"
   val akkaVersion = "2.5.6"
   Seq(
     "org.mockito" % "mockito-core" % "1.10.19" % Test,
 
-    "com.typesafe.akka" %% "akka-http" % "10.0.10",
-    "com.typesafe.akka" %% "akka-http-testkit" % "10.0.10" % Test,
+    "com.typesafe.akka" %% "akka-http" % akkaHttpVersion,
+    "com.typesafe.akka" %% "akka-http-spray-json" % akkaHttpVersion,
+
+  "com.typesafe.akka" %% "akka-http-testkit" % akkaHttpVersion % Test,
     "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
 
     "joda-time" % "joda-time" % "2.7",
