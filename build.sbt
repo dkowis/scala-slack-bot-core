@@ -15,8 +15,8 @@ libraryDependencies ++= {
     "com.typesafe.akka" %% "akka-http" % akkaHttpVersion,
     "com.typesafe.akka" %% "akka-http-spray-json" % akkaHttpVersion,
 
-  "com.typesafe.akka" %% "akka-http-testkit" % akkaHttpVersion % Test,
-    "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
+    "com.typesafe.akka" %% "akka-http-testkit" % akkaHttpVersion % Test,
+    //"com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
 
     "joda-time" % "joda-time" % "2.7",
     "org.joda" % "joda-convert" % "1.7",

@@ -31,6 +31,7 @@ class WSActor(eventBus: MessageEventBus) extends Actor {
       val incoming: Sink[Message, Future[Done]] =
         Sink.foreach[Message] {
           case message: TextMessage =>
+            println(s"RECEIVED: ${message.getStrictText}")
             in ! message.getStrictText
         }
 
@@ -44,9 +45,9 @@ class WSActor(eventBus: MessageEventBus) extends Actor {
           outgoing)(Keep.right)
 
       val scheme = if (ssl) {
-        "https"
+        "wss"
       } else {
-        "http"
+        "ws"
       }
       val uri = Uri.from(
         host = host,
@@ -55,10 +56,6 @@ class WSActor(eventBus: MessageEventBus) extends Actor {
         path = resource
       )
 
-      //Old headers, might need to specify these in the WebSocketRequest
-      //HttpHeaders.RawHeader("Upgrade", "websocket"),
-      //HttpHeaders.RawHeader("Sec-WebSocket-Version", "13"),
-      //HttpHeaders.RawHeader("Sec-WebSocket-Key", Config.websocketKey))
       val (upgradeResponse, outgoingQueue) =
       Http().singleWebSocketRequest[SourceQueueWithComplete[Message]](
         WebSocketRequest(uri),
@@ -69,7 +66,6 @@ class WSActor(eventBus: MessageEventBus) extends Actor {
 
   def sendable(outgoing: SourceQueueWithComplete[Message]): Receive = {
     case WebSocket.Release =>
-      //TODO: close the websocket
       outgoing.complete() //This might end it all, because my outgoing is done?
 
     case WebSocket.Send(message) => //message to send
