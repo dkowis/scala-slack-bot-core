@@ -1,6 +1,6 @@
 name := "slack-scala-bot-core"
 
-version := "0.3.0"
+version := "0.3.0-SNAPSHOT"
 
 scalaVersion := "2.12.4"
 
