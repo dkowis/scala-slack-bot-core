@@ -1,62 +1,90 @@
 package io.scalac.slack.websockets
 
+import akka.Done
 import akka.actor.{Actor, Props}
-import akka.io.IO
+import akka.http.scaladsl.Http
+import akka.http.scaladsl.model.Uri
+import akka.http.scaladsl.model.ws.{Message, TextMessage, WebSocketRequest}
+import akka.stream.QueueOfferResult.{Dropped, Enqueued, Failure}
+import akka.stream.scaladsl.{Flow, Keep, Sink, Source, SourceQueueWithComplete}
 import io.scalac.slack._
-import spray.can.Http
-import spray.can.server.UHttp
-import spray.can.websocket.WebSocketClientWorker
-import spray.can.websocket.frame.{CloseFrame, StatusCode, TextFrame}
-import spray.http.{HttpHeaders, HttpMethods, HttpRequest}
+
+import scala.concurrent.Future
 
 /**
- * Created on 28.01.15 19:45
- */
-class WSActor(eventBus: MessageEventBus) extends Actor with WebSocketClientWorker {
+  * Created on 28.01.15 19:45
+  * TODO: this is probably a redundant actor, but I'm not sure how to do it a different way yet.
+  */
+class WSActor(eventBus: MessageEventBus) extends Actor {
 
-  override def receive = connect orElse handshaking orElse closeLogic
+  private val out = context.actorOf(Props(classOf[OutgoingMessageProcessor], self, eventBus))
+  private val in = context.actorOf(Props(classOf[IncomingMessageProcessor], eventBus))
 
-  val out = context.actorOf(Props(classOf[OutgoingMessageProcessor], self, eventBus))
-  val in = context.actorOf(Props(classOf[IncomingMessageProcessor], eventBus))
 
-  private def connect(): Receive = {
+  override def receive: Receive = {
     case WebSocket.Connect(host, port, resource, ssl) =>
-      val headers = List(
-        HttpHeaders.Host(host, port),
-        HttpHeaders.Connection("Upgrade"),
-        HttpHeaders.RawHeader("Upgrade", "websocket"),
-        HttpHeaders.RawHeader("Sec-WebSocket-Version", "13"),
-        HttpHeaders.RawHeader("Sec-WebSocket-Key", Config.websocketKey))
-      request = HttpRequest(HttpMethods.GET, resource, headers)
-      IO(UHttp)(context.system) ! Http.Connect(host, port, ssl)
+
+      val incoming: Sink[Message, Future[Done]] =
+        Sink.foreach[Message] {
+          case message: TextMessage =>
+            in ! message.getStrictText()
+        }
+
+      val overflowStrategy = akka.stream.OverflowStrategy.dropHead
+      val outgoing = Source.queue[Message](100, overflowStrategy)
+
+      //Create the new WebSocket flow
+      val flow: Flow[Message, Message, SourceQueueWithComplete[Message]] =
+        Flow.fromSinkAndSourceMat(
+          incoming,
+          outgoing)(Keep.right)
+
+      val scheme = if (ssl) {
+        "https"
+      } else {
+        "http"
+      }
+      val uri = Uri.from(
+        host = host,
+        port = port,
+        scheme = scheme,
+        path = resource
+      )
+
+      //Old headers, might need to specify these in the WebSocketRequest
+      //HttpHeaders.RawHeader("Upgrade", "websocket"),
+      //HttpHeaders.RawHeader("Sec-WebSocket-Version", "13"),
+      //HttpHeaders.RawHeader("Sec-WebSocket-Key", Config.websocketKey))
+      val (upgradeResponse, outgoingQueue) =
+      Http().singleWebSocketRequest[SourceQueueWithComplete[Message]](
+        WebSocketRequest(uri),
+        flow
+      )
+      context.become(sendable(outgoingQueue))
   }
 
-  override def businessLogic = {
-    case WebSocket.Release => close()
-    case TextFrame(msg) => //message received
-
-      // Each message without parsing is sent to eventprocessor
-      // Because all messages from websockets should be read fast
-      // If EventProcessor slow down with parsing
-      // can be used dispatcher
-      println(s"RECEIVED MESSAGE: ${msg.utf8String} ")
-      in ! msg.utf8String
+  def sendable(outgoing: SourceQueueWithComplete[Message]): Receive = {
+    case WebSocket.Release =>
+      //TODO: close the websocket
+      outgoing.complete() //This might end it all, because my outgoing is done?
 
     case WebSocket.Send(message) => //message to send
 
       println(s"SENT MESSAGE: $message ")
-      send(message)
-    case ignoreThis => // ignore
+      val result = outgoing.offer(TextMessage(message))
+      //TODO: should probably handle something in this, instead of doing *nothing*
+      result.map {
+        case Enqueued =>
+        //Something
+        case Dropped =>
+        //shit!
+        case Failure(uhoh) =>
+        //SHIT!
+      }
+
+    case ignoreThis => // ignore I don't know why they take an ignore this unless it's the _
+
   }
-
-  def send(message: String) = connection ! TextFrame(message)
-
-  def close() = connection ! CloseFrame(StatusCode.NormalClose)
-
-  private var request: HttpRequest = null
-
-  override def upgradeRequest = request
-
 }
 
 object WebSocket {
