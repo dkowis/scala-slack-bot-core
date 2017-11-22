@@ -1,6 +1,6 @@
 package io.scalac.slack.api
 
-import spray.http.{HttpMethod, HttpRequest}
+import akka.http.scaladsl.model.HttpMethod
 import spray.json.JsonReader
 
 import scala.concurrent.Future
