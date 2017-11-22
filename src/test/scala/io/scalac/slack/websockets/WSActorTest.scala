@@ -8,7 +8,7 @@ import akka.actor.{ActorSystem, Props}
 object WSActorTest {
 
   def main(args: Array[String]) {
-    implicit lazy val system = ActorSystem("TestEchoServer")
+    implicit lazy val system: ActorSystem = ActorSystem("TestEchoServer")
     var wsmsg = ""
     val wse = system.actorOf(Props[WSActor])
     //websocket echo service
@@ -21,7 +21,7 @@ object WSActorTest {
     wse ! WebSocket.Send(rock)
     Thread.sleep(2000L)
     wse ! WebSocket.Release
-    system.shutdown()
+    system.terminate()
     Thread.sleep(1000L)
   }
 

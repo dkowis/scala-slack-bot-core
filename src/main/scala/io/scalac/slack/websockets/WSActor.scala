@@ -1,15 +1,16 @@
 package io.scalac.slack.websockets
 
 import akka.Done
-import akka.actor.{Actor, Props}
+import akka.actor.{Actor, ActorSystem, Props}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.Uri
 import akka.http.scaladsl.model.ws.{Message, TextMessage, WebSocketRequest}
+import akka.stream.ActorMaterializer
 import akka.stream.QueueOfferResult.{Dropped, Enqueued, Failure}
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source, SourceQueueWithComplete}
 import io.scalac.slack._
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContextExecutor, Future}
 
 /**
   * Created on 28.01.15 19:45
@@ -20,6 +21,9 @@ class WSActor(eventBus: MessageEventBus) extends Actor {
   private val out = context.actorOf(Props(classOf[OutgoingMessageProcessor], self, eventBus))
   private val in = context.actorOf(Props(classOf[IncomingMessageProcessor], eventBus))
 
+  implicit val system: ActorSystem = context.system
+  implicit val dispatcher: ExecutionContextExecutor = system.dispatcher
+  implicit val materializer: ActorMaterializer = ActorMaterializer()
 
   override def receive: Receive = {
     case WebSocket.Connect(host, port, resource, ssl) =>
@@ -27,7 +31,7 @@ class WSActor(eventBus: MessageEventBus) extends Actor {
       val incoming: Sink[Message, Future[Done]] =
         Sink.foreach[Message] {
           case message: TextMessage =>
-            in ! message.getStrictText()
+            in ! message.getStrictText
         }
 
       val overflowStrategy = akka.stream.OverflowStrategy.dropHead
