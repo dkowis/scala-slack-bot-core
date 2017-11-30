@@ -21,6 +21,8 @@ class SlackBotActor(modules: BotModules, eventBus: MessageEventBus, master: Shut
 
   var errors = 0
 
+  //Refactor this so not so much setup is required. I should be able to new up an app, with just one thing
+
   override def receive: Receive = {
     case Start =>
       //test connection
